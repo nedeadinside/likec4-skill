@@ -8,6 +8,10 @@ runs the LikeC4 CLI over them and only hands them back if they pass.
 [![LikeC4](https://img.shields.io/badge/likec4-1.59.2%20pinned-3b82f6)](https://likec4.dev)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
+<p align="center">
+  <img src=".assets/workflow.png" alt="Workflow: your request goes to SKILL.md, which routes to the syntax references the task needs; the skill writes the model, likec4 validate and format --check gate it, errors loop back for a fix, and files are delivered only on pass" width="780">
+</p>
+
 ## Install
 
 ```bash
