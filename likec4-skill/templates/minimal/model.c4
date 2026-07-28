@@ -1,0 +1,17 @@
+// model.c4 — one system, its containers, one external dependency.
+model {
+  user = person 'User' 'Describe who uses the system'
+
+  app = system 'My System' 'What it does' {
+    ui = container 'Web UI' 'The frontend' { technology 'React' }
+    api = container 'API' 'The backend' { technology 'Node.js' }
+    db = database 'Database' 'Primary store' { technology 'PostgreSQL' }
+
+    user -> ui 'uses' 'HTTPS'
+    ui -> api 'calls' 'JSON/HTTPS'
+    api -> db 'reads/writes' 'SQL'
+  }
+
+  ext = externalSystem 'Third-party API' 'Payments provider'
+  app -> ext 'integrates with' 'REST/HTTPS'
+}

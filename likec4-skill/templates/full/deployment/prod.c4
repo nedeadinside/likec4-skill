@@ -1,0 +1,21 @@
+// deployment/prod.c4 — physical mapping of logical containers.
+// deploymentNode kinds are declared in spec.c4, not here.
+deployment {
+  environment prod 'Production' {
+    zone dmz 'DMZ' {
+      web1 = server 'Web Server' {
+        instanceOf internetBanking.web
+        instanceOf internetBanking.api
+      }
+    }
+    zone internal 'Internal Network' {
+      dbPrimary = server 'DB Primary' {
+        instanceOf internetBanking.db
+      }
+      dbStandby = server 'DB Standby' {
+        db2 = instanceOf internetBanking.db
+      }
+    }
+    dbPrimary -> dbStandby 'replicates to'
+  }
+}

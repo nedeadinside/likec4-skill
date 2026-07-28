@@ -1,0 +1,9 @@
+// spec.c4 — minimal specification. Built-in colors/shapes only.
+specification {
+  element person { style { shape person; color indigo } }
+  element system
+  element externalSystem { style { color gray } }
+  element container
+  element database { style { shape cylinder } }
+  relationship async { line dotted }
+}

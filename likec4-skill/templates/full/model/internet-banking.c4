@@ -1,0 +1,52 @@
+// model/internet-banking.c4 — internals via extend (Levels 2 & 3)
+model {
+  extend internetBanking {
+    web = container 'Web Application' 'Delivers static content and the SPA' {
+      technology 'Java, Spring MVC'
+    }
+    spa = container 'Single-Page Application' 'Account info and payments' {
+      technology 'JavaScript, Angular'
+      style { shape browser }
+    }
+    mobile = container 'Mobile App' 'A subset of banking features' {
+      technology 'Xamarin'
+      style { shape mobile }
+    }
+    api = container 'API Application' 'Banking features via a JSON/HTTPS API' {
+      technology 'Java, Spring Boot'
+
+      // Level 3 — components of the API container
+      signin = component 'Sign In Controller' 'Allows users to sign in' {
+        technology 'Spring MVC Rest Controller'
+      }
+      accounts = component 'Accounts Summary Controller' 'Provides account summaries' {
+        technology 'Spring MVC Rest Controller'
+      }
+      security = component 'Security Component' 'Authentication and authorization' {
+        technology 'Spring Bean'
+      }
+      mainframeFacade = component 'Mainframe Banking Facade' 'A facade onto the mainframe' {
+        technology 'Spring Bean'
+      }
+
+      signin -> security 'uses'
+      accounts -> mainframeFacade 'uses'
+      security -> db 'reads from and writes to' 'JDBC'
+      mainframeFacade -> mainframe 'makes API calls to' 'XML/HTTPS'
+    }
+    db = database 'Database' 'Stores registrations, hashed credentials, logs' {
+      technology 'Oracle Database'
+    }
+
+    // container-level relationships
+    customer -> web 'visits bigbank.com/ib using' 'HTTPS'
+    web -> spa 'delivers to the browser'
+    customer -> spa 'views balances and makes payments using'
+    customer -> mobile 'views balances and makes payments using'
+    spa -> api 'makes API calls to' 'JSON/HTTPS'
+    mobile -> api 'makes API calls to' 'JSON/HTTPS'
+    api -> db 'reads from and writes to' 'JDBC'
+    api -> mainframe 'makes API calls to' 'XML/HTTPS'
+    api -[async]-> email 'sends e-mail using'
+  }
+}

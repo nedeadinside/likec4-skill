@@ -1,0 +1,16 @@
+// model/externals.c4 — third-party systems.
+// The externalSystem kind already carries the gray style:
+// no tags, no per-element styles, no per-view restyling needed.
+model {
+  mainframe = externalSystem 'Mainframe Banking System' {
+    description 'Stores core banking information'
+  }
+  email = externalSystem 'E-mail System' {
+    description 'Microsoft Exchange'
+  }
+
+  customer -> internetBanking 'views balances and makes payments using'
+  internetBanking -> mainframe 'gets account information from'
+  internetBanking -[async]-> email 'sends e-mail using'
+  email -> customer 'sends e-mails to'
+}

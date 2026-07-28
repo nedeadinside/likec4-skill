@@ -1,0 +1,21 @@
+// views/dynamic-flows.c4 — dynamic scenario + deployment view.
+// Steps go through LEAF elements (api.signin, not the compound api container)
+// so the sequence variant renders cleanly and validate stays warning-free.
+views {
+  dynamic view signInFlow {
+    title 'Scenario - Customer sign in'
+
+    customer -> internetBanking.spa 'enters credentials'
+    internetBanking.spa -> internetBanking.api.signin 'POST /login'
+    internetBanking.api.signin -> internetBanking.api.security 'validates credentials using'
+    internetBanking.api.security -> internetBanking.db 'checks hashed password in'
+    internetBanking.api.security -> internetBanking.api.signin 'returns result to'
+    internetBanking.spa <- internetBanking.api.signin 'returns session token'
+  }
+
+  deployment view prodDeployment {
+    title 'Deployment - Production'
+    include prod.**
+    autoLayout LeftRight
+  }
+}

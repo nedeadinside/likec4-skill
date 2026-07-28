@@ -1,0 +1,20 @@
+// views/internet-banking-views.c4 — Levels 2 & 3 with drill-down
+views {
+  view containers of internetBanking {
+    title 'Containers - Internet Banking System'
+    include *
+    autoLayout TopBottom
+
+    // drill-down: click the API container to open its component view
+    include
+      internetBanking.api with {
+        navigateTo apiComponents
+      }
+  }
+
+  view apiComponents of internetBanking.api {
+    title 'Components - API Application'
+    include *
+    autoLayout TopBottom
+  }
+}

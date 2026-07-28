@@ -1,0 +1,14 @@
+// views.c4 — Context + Container views with drill-down.
+views {
+  view index {
+    title 'System Context'
+    include *
+    autoLayout LeftRight
+  }
+
+  view containers of app {
+    title 'Containers - My System'
+    include *
+    autoLayout TopBottom
+  }
+}

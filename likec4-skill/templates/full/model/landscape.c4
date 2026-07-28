@@ -1,0 +1,8 @@
+// model/landscape.c4 — top-level systems + actors (Level 1 material)
+model {
+  customer = person 'Personal Banking Customer' 'A customer with personal accounts'
+
+  internetBanking = system 'Internet Banking System' {
+    description 'View account information and make payments'
+  }
+}

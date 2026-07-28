@@ -1,0 +1,41 @@
+// spec.c4 — the ONLY specification block in the project.
+// Built-in theme colors and shapes only: no custom colors, no tags.
+specification {
+  element person {
+    notation 'Person'
+    style { shape person; color indigo }
+  }
+  element system {
+    notation 'Software System (in scope)'
+    // color primary is the default — in-scope stays blue
+  }
+  element externalSystem {
+    notation 'External System'
+    style { color gray }
+  }
+  element container {
+    notation 'Container'
+  }
+  element component {
+    notation 'Component'
+  }
+  element database {
+    notation 'Database'
+    style { shape cylinder }
+  }
+  element queue {
+    notation 'Message Queue'
+    style { shape queue }
+  }
+
+  relationship async {
+    line dotted
+  }
+
+  // Deployment node kinds live here too — specification stays in one file.
+  deploymentNode environment
+  deploymentNode zone
+  deploymentNode server {
+    style { icon tech:docker }
+  }
+}

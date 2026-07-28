@@ -1,0 +1,9 @@
+// views/context.c4 — Level 1.
+// Externals are already gray via the externalSystem kind — nothing to restyle.
+views {
+  view index {
+    title 'System Context - Internet Banking'
+    include *
+    autoLayout LeftRight
+  }
+}
