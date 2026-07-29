@@ -29,8 +29,7 @@ jobs:
 
       - name: Read pinned LikeC4 version
         id: pin
-        run: |
-          echo "version=$(grep -oP 'LIKEC4_VERSION="\K[^"]+' likec4-skill/scripts/check.sh)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(cat likec4-skill/scripts/likec4-version)" >> "$GITHUB_OUTPUT"
 
       - name: Build the site
         run: |
