@@ -16,7 +16,7 @@ Components nest inside their container (directly, or via a deeper
 `extend <system>.<container>` when splitting files). The view is scoped to the
 container — inside it, references to nested elements should use **FQN**:
 
-```likec4
+```likec4 group=banking
 // inside extend internetBanking { api = container { … } }  — or separately:
 model {
   extend internetBanking.api {

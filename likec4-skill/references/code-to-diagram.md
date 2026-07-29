@@ -76,9 +76,9 @@ Direction follows the call/data flow. Label every edge with *what* and *how*.
 - Components of Orders Service: **HTTP API**, **Order Repository**,
   **Payment Client**, **Event Publisher**.
 
-**Resulting LikeC4** (validated on 1.59.2)
+**Resulting LikeC4** (validated on the pinned version)
 
-```likec4
+```likec4 group=shop
 // spec.c4 — built-ins only; broker is a project-specific kind
 specification {
   element person        { style { shape person; color indigo } }
@@ -91,7 +91,7 @@ specification {
   relationship async    { line dotted }
 }
 ```
-```likec4
+```likec4 group=shop
 // model.c4
 model {
   customer = person 'Customer' 'Places orders in the shop'
@@ -138,7 +138,7 @@ model {
   orders -> stripe 'creates charges via' 'REST/HTTPS'
 }
 ```
-```likec4
+```likec4 group=shop
 // views.c4
 views {
   view index {

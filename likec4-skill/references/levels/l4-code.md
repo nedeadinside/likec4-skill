@@ -14,7 +14,7 @@ Default is still to skip it — this level of detail lives in the code, code-lev
 Before modeling code, offer the cheap option — attach source links to the
 component; the model stays truthful with zero maintenance:
 
-```likec4
+```likec4 group=banking
 model {
   extend internetBanking.api.security {
     link ../src/security/index.ts#L1-L40 'Source'
@@ -30,7 +30,7 @@ Declare in `spec.c4` only the kinds you actually use, style them smaller so
 the code level reads visually different from components, and give code
 relationships their own kinds:
 
-```likec4
+```likec4 group=banking
 specification {
   // Level 4 kinds — declare only what you actually use
   element class {

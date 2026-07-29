@@ -15,7 +15,7 @@ relationships, and optionally an enterprise boundary. Every person and software 
 Top-level elements in `model/landscape.c4` and `model/externals.c4`, one
 unscoped view named `index` (the default landing view):
 
-```likec4
+```likec4 group=banking
 // model/landscape.c4
 model {
   customer = person 'Personal Banking Customer' 'A customer with personal accounts'
@@ -51,7 +51,7 @@ Full working files: `templates/full/model/landscape.c4`,
 When several in-scope systems must be shown together (enterprise/portfolio
 map), it's just a wider unscoped view over the top-level elements, effectively a System Context diagram without a specific focus on one particular software system. It shows how multiple software systems fit together within the bounds of an enterprise:
 
-```likec4
+```likec4 group=banking
 views {
   view landscape {
     title 'System Landscape'

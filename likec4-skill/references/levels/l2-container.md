@@ -14,7 +14,7 @@ relationships with protocols, communication styles, and port numbers; keep perso
 `view of <system>` shows the containers and becomes the system's drill-down
 target:
 
-```likec4
+```likec4 group=banking
 // model/internet-banking.c4
 model {
   extend internetBanking {
