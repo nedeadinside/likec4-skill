@@ -17,11 +17,13 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Validate templates
+      - name: Validate skill
         run: likec4-skill/scripts/check.sh
 
+      # snippet-fixtures.md is test scaffolding for check-snippets.sh — it has
+      # no meaning outside this repo, so it does not ship to users.
       - name: Build zip
-        run: zip -r likec4-skill.zip likec4-skill
+        run: zip -r likec4-skill.zip likec4-skill -x 'likec4-skill/scripts/snippet-fixtures.md'
 
       - name: Create release
         env:
