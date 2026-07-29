@@ -15,8 +15,7 @@ compatibility: opencode
 metadata:
   domain: software-architecture
   dsl: likec4
-  likec4-version: 1.59.2
-  likec4-min-version: 1.53.0
+  likec4-version-file: scripts/likec4-version
 ---
 
 # LikeC4 C4 Diagrams
@@ -26,31 +25,38 @@ codebase, and validate them with the CLI before delivery. References are split
 by concern — read only what the task needs, **before** writing that part; do
 not guess syntax.
 
-Everything here is verified against **likec4 1.59.2** (see
+Everything here is verified against the pinned LikeC4 version (see
 `references/setup-and-validation.md` for the pin and upgrade procedure).
 
 ## Hard rules (only two)
 
-1. **Validate before delivering.** Run `likec4 validate` on the project and
-   deliver only on exit 0. No CLI available at all → do the documented
-   self-check and disclose it. Procedure: `references/setup-and-validation.md`.
+1. **Validate before delivering.** Run `likec4 validate <dir>` on the project
+   and deliver only on exit 0 — bare directory, never `--file` (that reports on
+   the filtered subset and exits 0 while the project is broken). Exit 0 is
+   necessary, not sufficient: a `with { }` in a deployment view and a missed
+   relationship `extend` both compile clean and render wrong. No CLI available
+   at all → do the documented self-check and disclose it. Procedure and the
+   full list: `references/setup-and-validation.md`.
 2. **Never invent DSL syntax.** If unsure, open the relevant reference; if
    still unsure, consult https://likec4.dev/dsl/.
 
 ## Setup (first thing, once per session)
 
+**The pinned version is the single line in `scripts/likec4-version`, next to this
+file.** Read it, then build every command from it — the number is not written
+anywhere else, so it can never go stale:
+
 ```bash
-LC4="npx -y likec4@1.59.2"
-v="$(likec4 --version 2>/dev/null | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+' | tail -1)"
-[ -n "$v" ] && [ "$(printf '%s\n1.53.0\n' "$v" | sort -V | head -1)" = "1.53.0" ] && LC4=likec4
+PIN="$(cat <this-skill-folder>/scripts/likec4-version)"
+LC4="npx -y likec4@$PIN"
 ```
-An installed CLI is used only at **>= 1.53.0** — older ones have no `format`
-command and 1.52.0 exits 0 on invalid models, so both gates below would pass
-silently. No global install required — `npx -y likec4@1.59.2` works in any
-environment with Node 22+ and network (first run downloads, then cached). For
-projects the user keeps, recommend `npm install --save-dev likec4@1.59.2`.
-Details, version floor, offline fallback, and the error catalogue:
-`references/setup-and-validation.md`.
+
+**Always that pin, never a locally installed `likec4`.** Every construct in this
+skill is verified against it; other versions disagree silently — they reject
+syntax documented here, or exit 0 on models this one rejects. The pin works in
+any environment with Node 22+ and network (first run downloads, then cached).
+For projects the user keeps, recommend `npm install --save-dev likec4@$PIN`.
+Details and the error catalogue: `references/setup-and-validation.md`.
 
 ## Task → what to read
 
@@ -61,11 +67,14 @@ Details, version floor, offline fallback, and the error catalogue:
 | Components (inside one container) | `references/levels/l3-component.md` |
 | Code level — classes/interfaces of one component | `references/levels/l4-code.md` |
 | Data flow / scenario / sequence (login, checkout, pipeline) | `references/levels/flows-dynamic.md` |
+| A flow with a branch, retry, error path, or "as a sequence diagram" | `references/levels/flows-dynamic.md` (`alt`/`opt`/`loop`/`try`, `variant sequence`) |
 | Infrastructure / "where does it run" | `references/levels/deployment.md` |
-| Any cross-cutting DSL question (spec, model, FQN, extend, predicates) | `references/syntax-core.md` |
+| Any cross-cutting DSL question (spec, model, FQN, extend) | `references/syntax-core.md` |
+| Choosing what a view shows — `include`/`exclude`, `where` filters on tags/metadata, `with` overrides | `references/predicates.md` |
 | Colors, shapes, icons, legend, layout | `references/styling.md` |
 | Given a repo / source code | `references/code-to-diagram.md` |
-| Install, validate, format, errors, preview/export/CI | `references/setup-and-validation.md` |
+| Install, validate, format, errors, preview/export/CI, CLI flags | `references/setup-and-validation.md` |
+| Config file, several models in one repo, `import` across projects | `references/project-config.md` |
 
 ## Scale the structure to the task
 
@@ -128,3 +137,6 @@ no tags. This keeps the C4 convention and adapts to light/dark themes.
 - [ ] Every view has a `title`; ≤ ~20 elements per view — split crowded views.
 - [ ] Levels connect: Context → Container → Component via `view of` /
       `navigateTo`.
+- [ ] No silent failure: if the model uses a deployment view or an `extend` on a
+      relationship, confirm the result (`$LC4 export json <dir> --skip-layout`)
+      — both compile clean when wrong.
