@@ -1,63 +1,38 @@
 # Setup & validation
 
-## Pinned version
+## Pinned version — one file, no exceptions
 
-This skill is written and tested against **LikeC4 1.59.2** (also verified on
-1.56.0). The DSL evolves between minor versions, so use the pin — snippets in
-this skill are guaranteed to compile on it, not on arbitrary versions.
-Requires **Node.js 22+** (the package declares `node >=22.22.3`; npm treats
-`engines` as advisory, recent Node 22 works).
+The pin is the single line in **`scripts/likec4-version`**. That file is the only
+place the number exists: the checks read it, and so should you. Every construct
+in this skill is compiled against it (`scripts/check-snippets.sh` proves it on
+every snippet in every reference file). The DSL changes between minor versions,
+so the pin is the contract:
 
-### Minimum usable version: 1.53.0
-
-An already-installed CLI is only acceptable at **>= 1.53.0**. Below that the
-skill's two hard rules cannot be enforced — measured, not guessed:
-
-| Range | What breaks |
-| --- | --- |
-| < 1.52.0 | No `format` command. `likec4 format <dir> --check` is an *unknown command*: it prints the help text and **exits 0**, so the format gate silently passes without checking anything. |
-| 1.52.0 | `format` exists, but `validate` prints `ERROR ... Invalid` and still **exits 0** on a broken model — the "deliver only on exit 0" rule becomes meaningless. |
-| >= 1.53.0 | Both commands behave: `validate` exits 1 on an invalid model, `format --check` exits 1 on drift. Templates compile and are already canonical; `export json` output is identical to 1.59.2. |
-
-So: below 1.53.0 ignore the installed binary and run the pinned version via
-`npx` instead. `scripts/check.sh` enforces this automatically.
-
-## Getting a working `likec4` command
-
-Resolution order — use the first that applies:
-
-1. **Already on PATH** (`command -v likec4`) → check `likec4 --version` first.
-   `>= 1.53.0` → use it as-is (expect some syntax drift the further it is from
-   the pin). Older → skip it, go to step 3.
-2. **Project has it as a dependency** (`node_modules/.bin/likec4` or
-   `likec4` in `package.json`) → run via `npx likec4 <command>` from the
-   project root.
-3. **Nothing installed** → run pinned, no install step needed:
-   ```bash
-   npx -y likec4@1.59.2 <command>
-   ```
-   First run downloads the package (~a minute); later runs hit the npx cache.
-
-For a project the user will keep, recommend a dev dependency so the version is
-pinned per-project and CI-reproducible:
 ```bash
-npm install --save-dev likec4@1.59.2
-```
-Global install (`npm i -g likec4`) works but is not recommended: it drifts from
-per-project versions and breaks reproducibility.
-
-One-liner used throughout this skill — takes the installed CLI only if it is
-new enough, otherwise the pin:
-```bash
-LC4="npx -y likec4@1.59.2"
-# --version can also print an "Update available" banner — keep the semver line
-v="$(likec4 --version 2>/dev/null | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+' | tail -1)"
-[ -n "$v" ] && [ "$(printf '%s\n1.53.0\n' "$v" | sort -V | head -1)" = "1.53.0" ] && LC4=likec4
+PIN="$(cat <this-skill-folder>/scripts/likec4-version)"
+LC4="npx -y likec4@$PIN"
 $LC4 validate <dir>
 ```
 
-If the environment has no network and no cached/installed likec4, fall back to
-the self-check below and say so explicitly.
+**Do not substitute a locally installed `likec4`**, however new it looks. Other
+versions disagree quietly rather than loudly: measured, older CLIs both reject
+valid flow-control syntax and exit 0 on models this one rejects — either way the
+delivery gate stops meaning anything. Run the pin, always.
+
+Requires **Node.js 22+** (the package declares `node >=22.22.3`; npm treats
+`engines` as advisory, recent Node 22 works). First `npx` run downloads the
+package (~a minute); later runs hit the npx cache.
+
+For a project the user will keep, recommend the same version as a dev
+dependency, so their CI reproduces what was delivered:
+```bash
+npm install --save-dev "likec4@$PIN"
+```
+Global install (`npm i -g likec4`) is not recommended: it drifts from
+per-project versions and breaks reproducibility.
+
+If the environment has no network and no cached likec4, fall back to the
+self-check below and say so explicitly.
 
 ## Validate — in place, before delivery
 
@@ -112,21 +87,53 @@ Order in practice: **write → `validate` (exit 0) → `format` → `validate`
 again**. Formatting a file that doesn't parse is pointless, which is why
 `validate` comes first.
 
+## Fast iteration loop — `--json --file`, never as the gate
+
+While editing one file, narrow the output instead of re-reading the whole
+project's errors:
+
+```bash
+$LC4 validate --json --no-layout -f ./architecture/model/orders.c4 ./architecture
+```
+
+```json
+{ "valid": true, "errors": [],
+  "stats": { "totalFiles": 2, "totalErrors": 2, "filteredFiles": 0, "filteredErrors": 0 } }
+```
+
+- `--no-layout` skips layout computation — noticeably faster in a tight loop.
+- `-f` / `--file` is repeatable and restricts *reporting* to those files.
+- `filteredFiles` counts **filtered files that contain errors**, not the number
+  of `-f` flags. On a clean file it is `0`, which is not a problem.
+
+**The trap:** `valid` and the **exit code describe only the filtered subset**.
+Above, `valid: true` and exit `0` while `totalErrors: 2` — two real errors
+elsewhere in the project. Read `stats.totalErrors`, which stays honest.
+
+So `--file` is an iteration tool. The delivery gate is always the bare project
+path.
+
 ### Delivery gate
 
-Both must hold before handing anything over:
+Both must hold before handing anything over — no `--file`, no `--json`:
 
 ```bash
 $LC4 validate ./architecture     # exit 0
 $LC4 format   ./architecture --check   # exit 0
 ```
 
+Exit 0 is necessary, not sufficient: three constructs compile clean and still
+produce the wrong diagram. Check them by hand if the model uses them —
+`with { }` in a deployment view (renders **empty**, `levels/deployment.md`),
+an `extend` on a relationship whose matcher misses (`syntax-core.md`), and
+`validate --file` run as if it were this gate.
+
 In CI, run the same two commands — `--check` keeps the repo formatted without
 the pipeline ever writing to the working tree.
 
 ## Reading errors → fixes (catalogue)
 
-Messages below are verbatim from the compiler (verified on 1.59.2).
+Messages below are verbatim from the compiler (verified on the pinned version).
 
 | Message | Cause | Fix |
 | --- | --- | --- |
@@ -140,6 +147,46 @@ Messages below are verbatim from the compiler (verified on 1.59.2).
 | `'X' already defined` | Two elements share a name under the same parent | Rename one, or nest it under a different parent |
 | Errors about `include`/`exclude`/`where`/`with` tokens | Predicate ordering — `where` must come **before** `with`; view properties before predicates | Reorder per `syntax-core.md` |
 | Layout drift warning | Manual layout in a `.c4` is stale | Re-open in the editor to relayout, or ignore if you don't use manual layout |
+| `Could not resolve reference to Referenceable named 'loop'` (or `alt`, `opt`, `try`) | Flow-control block in a dynamic view compiled by a CLI older than the pin | Run the pinned version; the keywords parse as element names on older ones |
+| `"when" alternative branch must be inside "alt"` | `when`/`if`/`else` outside an `alt` block | Wrap the branches in `alt { … }` (`levels/flows-dynamic.md`) |
+| `"loop" can not be used as an alternative branch, only "if", "when" or "else" are allowed` | `loop`/`opt`/`parallel`/`try` written as a direct child of `alt` | Nest it inside a `when` / `else` branch |
+| `Nested parallel blocks are not allowed` | `parallel` inside `parallel` | One `parallel` block holds all the concurrent steps |
+| ``Expecting token of type '}' but found `metadata` `` (dynamic step) | A step body takes `title`/`description`/`technology`/`notes`/`navigateTo` only | Put metadata on the model relationship instead |
+| `Could not resolve reference to DynamicView named 'X'` | `navigateTo` in a **dynamic** step pointing at a static view | Point it at a `dynamic view`, or navigate from a static view instead |
+| ``Expecting token of type '}' but found `global` `` (deployment view) | `global style` used inside a deployment view | Use a local `style … { }` predicate in that view |
+
+### Errors the compiler does *not* report
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Deployment view renders empty, `✓ Valid` | `include … with { … }` in a deployment view | Local `style` predicate instead (`levels/deployment.md`) |
+| `extend` on a relationship changes nothing, `✓ Valid` | Matcher missed: source + target + kind + title must all match | Repeat the relationship verbatim, kind arrow included (`syntax-core.md`) |
+| `valid: true`, exit 0 on a project you know is broken | `validate --file` was used as the gate | Gate on bare `validate <dir>`; read `stats.totalErrors` |
+| Config options have no effect; `import` stops resolving | A broken or misspelled `likec4.config.json` is skipped, not reported — `validate` still exits 0 | Read the `add '<name>'` / `loaded N projects` lines (`project-config.md`) |
+
+### When the message doesn't say enough — debugging order
+
+1. **Locate the file.** `$LC4 validate --json --no-layout -f <edited.c4> <dir>`:
+   `filteredErrors: 0` with `totalErrors > 0` means your file is clean and the
+   problem is upstream.
+2. **Fix the first error only, then re-run.** Later ones are usually cascades of
+   the first unresolved name.
+3. **Check the FQN against the hierarchy**, character by character — most
+   `not resolved` errors are a missing parent segment, not a typo.
+4. **Bisect by block.** Comment out `model`, `deployment` and `views`; validate
+   `specification` alone, then add one block back at a time.
+5. **Test a predicate in isolation.** Copy the failing `include`/`exclude` into
+   a throwaway view with `include *` above it — wildcard scope
+   (`predicates.md`) is the usual culprit.
+6. **Inspect the result, not just the exit code:** `$LC4 export json <dir>
+   --skip-layout --pretty` shows what was actually computed. This is the only
+   way to see the silent failures below.
+
+### Large models
+
+- Keep `specification` in its own file: editing it re-parses the whole project.
+- A view that exports as a partial image is too big — split it and link with
+  `navigateTo` (the ≤ ~20 element rule in SKILL.md exists for this reason).
 
 Also watch **stderr warnings** even on exit 0 — e.g. `Sequence view does not
 support nested actors` means a dynamic view steps through a compound element;
@@ -162,19 +209,44 @@ the user run `likec4 validate` locally. Check:
 
 ## After validation — preview, export, CI
 
-Delivering `.c4` files is half the job; tell the user how to use them:
+Delivering `.c4` files is half the job; tell the user how to use them.
+
+**The command list is closed.** `likec4 <command>` is one of: `start`
+(`serve`/`dev`), `build` (`bundle`), `gen` (`generate`/`codegen`), `export`,
+`format` (`fmt`), `preview`, `sync`, `validate`, `list-icons`, `mcp`, `lsp`,
+`check-update`, `completion`. There is **no** `check`, `lint`, `verify`,
+`compile` or `render` command — the model that invents one gets a help dump and
+**exit 0**, which is how a broken model ships. Every command takes the project
+directory as its last argument and `-p <project>` to pick one project of a
+multi-project workspace.
 
 - **Live preview:** `$LC4 start ./architecture` — local dev server with hot
   reload; keep it running while editing. The **VS Code extension "LikeC4"**
   gives inline previews and language support in the editor.
-- **Static site:** `$LC4 build ./architecture -o ./dist` — single deployable
-  website with all views (the likec4/template repo shows GitHub Pages setup).
-- **Images:** `$LC4 export png ./architecture -o ./images` — PNG per view
-  (uses Playwright; the CLI prompts to install it on first run). `export jpg`
-  also available.
-- **Other formats:** `$LC4 codegen mermaid|d2|dot|plantuml` to embed diagrams
-  in READMEs/PRs; `$LC4 export json` for structured data.
-- **CI:** run `validate` (and optionally `build`) in the pipeline; official
+- **Static site:** `$LC4 build ./architecture -o ./dist` — one deployable
+  website with all views. Useful flags: `--base /repo-name/` for GitHub Pages,
+  `--theme dark`, `--output-single-file`, `--public ./assets`.
+- **Images:** `$LC4 export png ./architecture -o ./images` — PNG per view (uses
+  Playwright; the CLI prompts to install it on first run).
+  `--flat` puts every image in one directory instead of mirroring the source
+  tree, `--theme light|dark`, `--seq` renders dynamic views with the sequence
+  layout, `-f <pattern>` exports only matching view ids, `-i` continues past a
+  view that fails. `export jpg` and `export drawio` take the same shape.
+  **Watch the flag collision:** `-f` is `--file` on `validate` but `--filter`
+  on `export`; `-o` is `--outdir` for `png` and `--outfile` for `json`.
+- **Structured data:** `$LC4 export json ./architecture -o model.json
+  --skip-layout --pretty` — the fastest way to *inspect what the model actually
+  computed*, which is how you catch the silent failures listed above.
+- **Diagrams for READMEs/PRs:** `$LC4 gen mermaid|plantuml|d2|dot ./architecture`
+  (`codegen` is an alias of `gen`). Also `gen model` for a typed
+  `LikeC4Model.ts`, `gen react`, `gen webcomponent`.
+- **Icons:** `$LC4 list-icons` lists ~5k bundled icons; `-g aws|azure|gcp|tech|bootstrap`
+  filters by group and `-f json` makes it greppable — use it instead of
+  guessing an icon name (a wrong one fails with
+  `Could not resolve reference to LibIcon named 'X'`).
+- **MCP server:** `$LC4 mcp ./architecture` (stdio by default, `--http` /
+  `-p <port>` for HTTP) exposes the model to an MCP client.
+- **CI:** run `validate` and `format --check` in the pipeline; official
   LikeC4 GitHub Actions exist for preview/export.
 
 ## Final gate

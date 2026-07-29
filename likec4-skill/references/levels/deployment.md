@@ -11,7 +11,7 @@ Three parts: `deploymentNode` kinds (declared in the project's single
 `spec.c4`, like all kinds), a `deployment { … }` block with the node
 hierarchy, and a `deployment view`.
 
-```likec4
+```likec4 group=banking
 // spec.c4 (excerpt)
 specification {
   deploymentNode environment
@@ -24,7 +24,7 @@ deployment {
   environment prod 'Production' {
     zone dmz 'DMZ' {
       web1 = server 'Web Server' {
-        instanceOf internetBanking.web    // deploy a logical container
+        instanceOf internetBanking.spa    // deploy a logical container
         instanceOf internetBanking.api
       }
     }
@@ -66,6 +66,63 @@ Full working files: `templates/full/spec.c4` (node kinds),
   per environment scales well (`deployment/prod.c4`, `deployment/staging.c4`).
 - `include prod.**` shows the whole hierarchy; add `includeAncestors true` to
   force ancestors of filtered nodes to render.
+
+## Filtering a deployment view — how tags and metadata resolve
+
+An instance is not a copy of the logical element; the two are merged, and tags
+and metadata merge by **different rules**. measured on the pinned version:
+
+| Property | Rule |
+| --- | --- |
+| `kind` | the instance takes the logical element's kind |
+| tags | **cumulative** — the instance matches its own tags *and* the logical element's |
+| metadata | **replaced wholesale** — if the instance declares any `metadata`, the logical element's is not visible at all; with none, the logical metadata is the fallback |
+| parent nodes | tags of enclosing deployment nodes are **not** inherited by instances |
+
+```likec4 group=banking
+views {
+  deployment view prodEu {
+    title 'Deployment - EU only'
+    include prod.** where not metadata.retired
+    autoLayout LeftRight
+  }
+}
+```
+
+The consequence that bites: adding one metadata key to an instance to record,
+say, its port silently drops every filter that matched the logical element's
+metadata. Either repeat the logical keys on the instance or keep instance
+metadata empty.
+
+## Styling a deployment view — local `style` only
+
+This is the one place in LikeC4 where `likec4 validate` exits **0 on a broken
+result**. `with { … }` on a deployment-view predicate compiles, reports
+`✓ Valid`, and renders **zero nodes** — measured on the pinned version via `export json`:
+
+| Need | Write | Never |
+| --- | --- | --- |
+| Colour/shape inside one deployment view | `style` predicate in the view | `include … with { … }` — valid, **empty view** |
+| Colour/shape everywhere | `style { … }` on the `deploymentNode` kind in `spec.c4` | `global style` inside the view — parse error |
+
+```likec4 group=banking
+views {
+  deployment view prodStyled {
+    title 'Deployment - Production (styled)'
+    include prod.**
+    style * {
+      color green
+    }
+    style prod.dmz.web1 {
+      color amber
+    }
+  }
+}
+```
+
+Because the failure is invisible to the gate, check the node count after
+styling a deployment view — `$LC4 export json <dir> --outfile out.json
+--skip-layout` and confirm the view is not empty.
 
 ## Common errors
 
