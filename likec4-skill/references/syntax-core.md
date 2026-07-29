@@ -1,6 +1,6 @@
 # LikeC4 DSL — core syntax (cross-cutting)
 
-Verified against **likec4 1.59.2** — every snippet in this file was compiled
+Verified against the pinned LikeC4 version — every snippet in this file was compiled
 with `likec4 validate` on that version. Level-specific constructs live in
 `levels/` (dynamic views → `levels/flows-dynamic.md`, deployment →
 `levels/deployment.md`). Authoritative upstream docs: https://likec4.dev/dsl/ —
@@ -10,7 +10,9 @@ consult only if something here doesn't cover the case; never invent keywords.
 
 - Source files end in `.c4` or `.likec4`. **All files under a project folder
   are recursively merged into a single model** — order across files does not
-  matter, and no configuration file is required.
+  matter, and a single project needs no configuration file. A config is what
+  separates *two* models in one repo and what `import` resolves against:
+  `references/project-config.md`.
 - Comments: `// line` and `/* block */`.
 - **Separators:** `;` separates *properties* inside `style { … }` and inside a
   view body (`view v { title 'T'; include * }`). It does **not** separate
@@ -64,19 +66,28 @@ relies on them.
 
 An element needs a **kind** and a **name**. Two equivalent forms:
 
-```likec4
+```likec4 fixture=kinds
 model {
   person customer          // kind-first
-  customer = person        // name-first (with '=')
+  admin = person           // name-first (with '=')
 }
 ```
 
-Names: letters, digits, `-`, `_`; cannot start with a digit or contain `.`;
-must be unique within their parent.
+Names match `^[a-zA-Z_][a-zA-Z0-9_-]*$` and must be unique within their parent.
+
+| Valid | Invalid | Why / fix |
+| --- | --- | --- |
+| `api`, `API`, `_internal`, `my-api`, `api2`, `api-` | `2api` | may not start with a digit → `api2` |
+| | `api.v2` | `.` is the FQN separator → `apiV2`, then nest it |
+| | `api$x`, `api x` | only letters, digits, `-`, `_` → `api_x` |
+
+The same rule applies to tag names, relationship kinds, metadata keys, custom
+color names and view names. Titles are free text — put the human-readable form
+in `title`, not in the identifier.
 
 ### Element properties
 
-```likec4
+```likec4 fixture=kinds
 model {
   // Inlined: <name> = <kind> [title] [description] [technology]
   saas = system 'SaaS' 'Provides services to customers' 'Spring Boot'
@@ -103,7 +114,7 @@ Putting a `#tag` after `title`/`description` is a compile error:
 `Expecting token of type '}' but found '#'`.)
 
 Markdown in `description`/`summary` via triple quotes:
-```likec4
+```likec4 fixture=kinds
 model {
   web = container {
     description '''
@@ -117,7 +128,7 @@ model {
 ### Nesting & fully qualified names (FQN)
 
 Any element can contain others; the parent name prefixes the child.
-```likec4
+```likec4 fixture=kinds
 model {
   system cloud {
     container backend {
@@ -134,7 +145,7 @@ model {
 Defined with `->`. Give every relationship a label; for container/component
 edges also state the protocol/technology.
 
-```likec4
+```likec4 fixture=stubs
 model {
   customer -> frontend 'opens in browser'
 
@@ -151,7 +162,7 @@ model {
 ```
 
 Inline order is `[title] [description] [technology]`:
-```likec4
+```likec4 fixture=stubs
 model {
   spa -> api 'requests data' 'SPA calls the backend' 'JSON/HTTPS'
 
@@ -175,7 +186,7 @@ siblings, or lift the edge to the right level.
 Lexical scope with hoisting (like JavaScript): every `{ … }` opens a scope; a
 name that stays unique "bubbles" up.
 
-```likec4
+```likec4 fixture=kinds
 model {
   system s1 {
     component api
@@ -197,7 +208,7 @@ and **always in views** (see the note in `levels/flows-dynamic.md`).
 `extend` enriches an element defined elsewhere; the target must be an **FQN**.
 The extension inherits the parent's scope, so sibling references work.
 
-```likec4
+```likec4 fixture=extend-target
 // landscape.c4
 model { cloud = system 'Cloud System' }
 
@@ -211,6 +222,64 @@ model {
 ```
 `extend` can also add links/metadata (and tags) to an existing element. Deeper
 targets work too: `extend cloud.backend { … }`.
+
+**Metadata merges, it does not overwrite.** Extending an element that already
+has `metadata` merges the two blocks — and a key present in both becomes an
+**array**, keeping both values:
+
+```likec4 fixture=kinds
+model {
+  container api {
+    metadata {
+      port '8080'
+      owner 'team-a'
+    }
+  }
+  extend api {
+    metadata {
+      port '9090'
+      region 'eu'
+    }
+  }
+}
+// export json → { "port": ["8080","9090"], "owner": "team-a", "region": "eu" }
+```
+
+Use it deliberately (a container listening on two ports); if you meant to
+*change* a value, edit the original declaration instead — there is no override.
+
+### extend — relationships, and the matcher that silently misses
+
+`extend` also enriches a **relationship**, but it does not reference one by
+name: it re-states the relationship, and LikeC4 matches on **source + target +
+kind + title**. Miss any of those and nothing is applied — with no error and
+exit 0:
+
+```likec4 fixture=kinds
+model {
+  container api
+  queue events
+  api -[async]-> events 'publishes'
+  api -> events 'publishes'          // same pair, same title, different kind
+
+  extend api -[async]-> events 'publishes' {   // ✅ matches exactly one
+    metadata { timeout '5s' }
+  }
+}
+```
+
+| Written | Result on the model above |
+| --- | --- |
+| `extend api -[async]-> events 'publishes'` | ✅ applies to the async relationship |
+| `extend api -> events 'publishes'` | ⚠️ `✓ Valid`, exit 0, **applied to nothing** |
+| `extend api -[async]-> events` (title dropped) | ⚠️ same silent miss |
+
+measured on the pinned version (`export json`): with two kinded relationships between the
+same pair, the untyped `extend` landed on neither, while the `-[async]->` form
+landed on exactly the async one. So: **repeat the relationship verbatim** —
+same kind arrow, same title — and if the metadata does not show up in
+`export json`, the matcher missed; do not assume the compiler would have said
+so.
 
 ## views — projections of the model
 
@@ -229,7 +298,7 @@ views {
 
 ### Scoped views — `view of <element>`
 Inherits the element's scope and becomes its default drill-down target:
-```likec4
+```likec4 fixture=world
 views {
   view of cloud.backend {
     title 'Components - Backend'
@@ -239,7 +308,7 @@ views {
 ```
 
 ### Extending views
-```likec4
+```likec4 fixture=world
 views {
   view base { title 'Base'; include * }
   view detail extends base {
@@ -253,7 +322,7 @@ views {
 
 Order matters; `exclude` only removes what an earlier `include` added.
 
-```likec4
+```likec4 fixture=view
 view {
   include backend                 // element + its relations to visible ones
   include broker.*                // children
@@ -265,7 +334,7 @@ view {
 ```
 
 Relationship predicates:
-```likec4
+```likec4 fixture=view
 view {
   include customer -> cloud       // directed
   include customer <-> cloud      // any direction
@@ -274,20 +343,13 @@ view {
 }
 ```
 
-Filter with `where` (fields: `kind`, `tag`, `source.*`, `target.*`,
-`metadata.*`; operators `is`/`==`, `is not`/`!=`, `and`, `or`, `not`):
-```likec4
+Filter with `where`, override rendering with `with` (`where` always first;
+`with` needs known endpoints for relationships — `a -> b`, not open
+`cloud.* ->`):
+```likec4 fixture=view
 view {
   include cloud.* where kind is container
-  include -> backend where target.kind is database
   exclude * where kind is externalSystem
-}
-```
-
-Override rendering with `with` (`where` must come **before** `with`; `with`
-needs known endpoints for relationships — `a -> b`, not open `cloud.* ->`):
-```likec4
-view {
   include cloud.backend with {
     title 'Backend'
     navigateTo backendComponents   // custom drill-down
@@ -296,8 +358,13 @@ view {
 }
 ```
 
+**Full predicate reference — every expression form, metadata/tag filters,
+`predicateGroup`, and the scoped-vs-unscoped meaning of `*` —
+`references/predicates.md`.** Read it before writing any `where` beyond
+`kind is …`.
+
 ### Groups (visual boundaries)
-```likec4
+```likec4 fixture=view
 view {
   group 'Frontend' {
     color amber; opacity 20%; border solid
@@ -307,7 +374,7 @@ view {
 ```
 
 ### Style predicates
-```likec4
+```likec4 fixture=view
 view {
   include *
   style * { opacity 10% }
@@ -317,7 +384,7 @@ view {
 ```
 
 ### Layout & rank
-```likec4
+```likec4 fixture=view
 view {
   include *
   autoLayout LeftRight 120 110    // direction [rankSep] [nodeSep]
@@ -325,12 +392,24 @@ view {
   rank source { customer }        // push to start
   rank same   { api, billingApi } // align on one level
   rank sink   { analytics }       // push to end
+  // five values total: same, min, max, source, sink
 }
 ```
 
 ### Shared styles & predicates across views
-`global { style name * { … } }` + `global style name` inside a view; likewise
-`global { predicateGroup name { include … } }` + `global predicate name`.
+
+Declare in a top-level `global { }` block, use by name inside a view:
+
+| Declare | Use in a view |
+| --- | --- |
+| `global { style name * { … } }` — one rule | `global style name` |
+| `global { styleGroup name { style * { … } … } }` — several rules | `global style name` |
+| `global { predicateGroup name { include … } }` | `global predicate name` |
+
+Both style forms are valid; use `styleGroup` when the shared look needs more
+than one `style` rule. Note the asymmetry: the *declaration* keyword is plural
+(`predicateGroup`), the *usage* is singular (`global predicate`), and
+`global { predicate … }` does not exist. Details: `references/predicates.md`.
 
 ### Organizing the view list
 Use `/` in a `title`, or a common folder on the block:

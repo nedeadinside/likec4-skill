@@ -1,18 +1,40 @@
 # Styling — built-in colors, shapes, icons, layout
 
-Styling applies at three levels, each overriding the previous:
+Styling applies in five layers, each overriding the previous:
 1. **Kind** — `style { … }` in `specification` (all elements of a kind).
 2. **Element** — nested `style { … }` in `model`/`deployment`.
-3. **View** — `style` predicates / `with` overrides inside a view.
+3. **Views block** — a `style` predicate inside `views { }` but **outside** any
+   `view { }`: applies to every view in that block.
+4. **View** — `style` predicates inside one `view { }`.
+5. **Customized predicate** — `include … with { … }` on specific elements.
 
-Prefer level 1: style the *kind* once, keep elements and views clean.
+Prefer layer 1: style the *kind* once, keep elements and views clean. Layer 3 is
+the one people miss — it is how you theme a whole file of views at once:
+
+```likec4 fixture=kinds
+views {
+  style * {
+    opacity 15%
+  }
+  view a {
+    include *
+  }
+  view b {
+    include *
+  }
+}
+```
 
 ## Colors — use the built-in theme
 
-Built-in colors: `primary` (default), `secondary`, `muted`, `amber`, `gray`,
-`green`, `indigo`, `red`. They adapt to LikeC4's light/dark themes — which is
-why this skill does **not** define custom hex colors: hardcoded hex looks
-wrong in one of the two themes and adds boilerplate to every project.
+Built-in colors, 11 of them: `primary` (default), `secondary`, `muted`,
+`slate`, `blue`, `sky`, `indigo`, `green`, `amber`, `red`, `gray`. They adapt
+to LikeC4's light/dark themes — which is why this skill does **not** define
+custom hex colors: hardcoded hex looks wrong in one of the two themes and adds
+boilerplate to every project. (Custom ones exist —
+`color <name> <hex>` in the specification, declared before use, and
+`styles.theme.colors` in the project config — reach for them only when the
+user's project already relies on them.)
 
 C4 color convention via built-ins (baked into the templates' `spec.c4`):
 
@@ -58,7 +80,7 @@ specification {
 Bundled sets (5,000+ icons): `aws:`, `azure:`, `gcp:`, `tech:`, `bootstrap:` —
 or any image URL. `icon` works as a bare property, no `style` block needed.
 
-```likec4
+```likec4 fixture=kinds
 model {
   fn  = container 'Lambda'      { icon aws:lambda }
   pg  = database 'PostgreSQL'   { icon tech:postgresql }
@@ -91,14 +113,17 @@ model {
 specification {
   relationship async {
     line dotted        // dashed(default) | solid | dotted
-    head vee           // normal(default), onormal, diamond, odiamond,
-    tail none          //   crow, vee, open, none
+    head vee
+    tail none
   }
 }
 ```
-Defaults: line `dashed`, head `normal`, tail `none`. Multiple relations
-between the same pair merge into one edge; render them separately with
-`multiple true` on the relationship (in spec or via view `with`).
+Heads and tails take the same 10 values: `none`, `normal` (default head),
+`onormal`, `dot`, `odot`, `diamond`, `odiamond`, `crow`, `open`, `vee`. The
+`o…` variants are the hollow versions. Defaults: line `dashed`, head `normal`,
+tail `none`. Multiple relations between the same pair merge into one edge;
+render them separately with `multiple true` on the relationship (in spec or via
+view `with`).
 
 ## Legend / notation (the C4 "key")
 
