@@ -1,0 +1,86 @@
+name: pin
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Compare the pin with the latest release
+        id: v
+        run: |
+          current="$(cat likec4-skill/scripts/likec4-version)"
+          latest="$(npm view likec4 version)"
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest"   >> "$GITHUB_OUTPUT"
+          [ "$current" = "$latest" ] && echo "changed=false" >> "$GITHUB_OUTPUT" \
+                                     || echo "changed=true"  >> "$GITHUB_OUTPUT"
+          echo "pinned: $current, latest: $latest"
+
+      - name: Bump and verify
+        if: steps.v.outputs.changed == 'true'
+        id: bump
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          likec4-skill/scripts/bump-pin.sh "${{ steps.v.outputs.latest }}" 2>&1 | tee bump.log
+
+      - name: Open a pull request
+        if: steps.v.outputs.changed == 'true' && steps.bump.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LATEST: ${{ steps.v.outputs.latest }}
+          CURRENT: ${{ steps.v.outputs.current }}
+        run: |
+          branch="pin/likec4-${LATEST}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git commit -am "chore: pin likec4 ${LATEST}"
+          git push -f -u origin "$branch"
+          gh pr create --head "$branch" --title "chore: pin likec4 ${LATEST}" --body \
+            "\`${CURRENT}\` → \`${LATEST}\`.
+
+          \`scripts/check.sh\` passes on the new version: both templates compile and are
+          canonically formatted, every \`\`\`likec4 block in the docs compiles, and every
+          block marked \`invalid\` still fails. Version mentions in the docs were rewritten
+          along with the pin.
+
+          Worth a skim anyway — a release can add syntax the references do not mention yet." \
+            || echo "a pull request for $branch already exists"
+
+      - name: Open an issue instead
+        if: steps.v.outputs.changed == 'true' && steps.bump.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LATEST: ${{ steps.v.outputs.latest }}
+          CURRENT: ${{ steps.v.outputs.current }}
+        run: |
+          title="likec4 ${LATEST} breaks the skill"
+          gh issue list --state open --search "$title in:title" --json title \
+            --jq '.[].title' | grep -qxF "$title" && { echo "already reported"; exit 0; }
+          {
+            echo "The pin is \`${CURRENT}\`; \`${LATEST}\` is out and \`scripts/check.sh\` fails on it."
+            echo
+            echo "The pin was **not** moved. Something the skill documents no longer compiles,"
+            echo "so this needs a documentation fix, not a version bump."
+            echo
+            echo '```'
+            tail -60 bump.log
+            echo '```'
+          } > issue.md
+          gh issue create --title "$title" --body-file issue.md
