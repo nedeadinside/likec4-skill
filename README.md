@@ -73,6 +73,12 @@ The CLI is the acceptance test. `likec4 validate` and `likec4 format --check` ru
 version, and nothing gets delivered on a non-zero exit. If there's no CLI available at all, the
 skill says so out loud rather than guessing quietly.
 
+That also applies to the skill's own documentation: every LikeC4 snippet in it is compiled by CI
+against the pin. A reference file can't drift into syntax the compiler stopped accepting, and the
+error messages it quotes are checked to still be errors. Where exit 0 isn't enough — a deployment
+view styled with `with { }` validates and renders empty — the reference says so and says what to
+check instead.
+
 ## What it covers
 
 Six kinds of view. System Context and Container come either from your description or from the
@@ -148,15 +154,21 @@ likec4-skill/                   # the skill itself; repo root holds README and C
 ├── SKILL.md                    # entry point: workflow, plus routing to references
 ├── references/
 │   ├── syntax-core.md          # specification / model / views fundamentals
+│   ├── predicates.md           # include/exclude, where filters, with overrides
 │   ├── levels/                 # one file per level: l1-l4, deployment, flows
 │   ├── styling.md
+│   ├── project-config.md       # config file, multi-project workspaces, import
 │   ├── code-to-diagram.md      # generating C4 from an existing codebase
 │   └── setup-and-validation.md
 ├── templates/
 │   ├── minimal/                # smallest valid 3-file project
 │   └── full/                   # multi-file: model/, views/, deployment/
 └── scripts/
-    └── check.sh                # validates both templates with the pinned CLI
+    ├── likec4-version          # the pin, one line — single source of truth
+    ├── check.sh                # runs everything below
+    ├── check-snippets.sh       # compiles every ```likec4 block in the docs
+    ├── snippet-fixtures.md     # the surrounding model those blocks need
+    └── bump-pin.sh             # move the pin and re-verify everything
 ```
 
 References load on demand. `SKILL.md` points at the single file the task needs, so asking for a
@@ -167,14 +179,30 @@ container view doesn't drag deployment syntax into the context window.
 <details>
 <summary>Development</summary>
 
-`LIKEC4_VERSION` in `scripts/check.sh` is the single source of truth for the pin. To upgrade:
-change it, run the script, and if it exits 0 commit the bump together with the version mentioned in
-`references/setup-and-validation.md` and `SKILL.md`.
+`scripts/check.sh` is the whole test suite, and CI runs it on every push:
 
-Minimum supported LikeC4 is 1.53.0 (`LIKEC4_MIN`). Below 1.52.0 there's no `format` command, so an
-unknown command exits 0 and the format gate silently passes. 1.52.0 itself exits 0 on an invalid
-model. An installed CLI at or above the floor is used as-is; anything older is ignored in favour of
-the pin.
+- both templates `validate` and are already `format --check` clean;
+- every ` ```likec4 ` block in `SKILL.md` and `references/` compiles — each one becomes a throwaway
+  LikeC4 project and the lot is validated in a single CLI run;
+- every block tagged ` ```likec4 invalid ` still **fails** to compile, so the documented error
+  messages keep describing the compiler that exists.
+
+Blocks that need surrounding model to compile pull it from `scripts/snippet-fixtures.md`
+(` ```likec4 fixture=NAME `), and worked examples that span several files share one project
+(` ```likec4 group=NAME `). That keeps the docs made of short fragments while still compiling all
+of them.
+
+The pin lives in `scripts/likec4-version`, one line, and nothing else hardcodes it. It's used
+unconditionally — a locally installed `likec4` is never substituted, because other versions
+disagree quietly (older ones reject dynamic-view flow-control blocks that are correct on the pin).
+
+Upgrading is `scripts/bump-pin.sh [version]`: it moves the pin, rewrites every version mentioned in
+the docs, and then runs the full check. It exits 0 only if the skill still holds together on the
+new version, so nothing gets bumped into a release that doesn't compile.
+
+A scheduled workflow does that daily against `npm view likec4 version`. Clean bump → pull request.
+Something the docs claim stops compiling → issue with the failing output, and the pin stays put,
+because that's a documentation fix rather than a version bump.
 
 </details>
 
