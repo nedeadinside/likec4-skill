@@ -5,7 +5,7 @@ system, or point it at a repo, and it produces `.c4` files for the C4 levels you
 runs the LikeC4 CLI over them and only hands them back if they pass.
 
 [![Release](https://img.shields.io/github/v/release/nedeadinside/likec4-skill?logo=github&label=release)](https://github.com/nedeadinside/likec4-skill/releases/latest)
-[![LikeC4](https://img.shields.io/badge/likec4-1.59.2%20pinned-3b82f6)](https://likec4.dev)
+[![LikeC4](https://img.shields.io/badge/likec4-1.59.4%20pinned-3b82f6)](https://likec4.dev)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 <p align="center">
